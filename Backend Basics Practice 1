@@ -1,0 +1,56 @@
+const express = require("express");
+const app = express();
+
+const PORT = 3000;
+
+// =====================
+// 1️⃣ Logger Middleware
+// =====================
+const logger = (req, res, next) => {
+  const timestamp = new Date().toISOString();
+  console.log(`[${timestamp}] ${req.method} ${req.originalUrl}`);
+  next(); // move to next middleware or route
+};
+
+// Apply logger globally
+app.use(logger);
+
+// =====================
+// 2️⃣ Auth Middleware
+// =====================
+const auth = (req, res, next) => {
+  const authHeader = req.headers["authorization"];
+
+  if (!authHeader) {
+    return res.status(401).json({ error: "Missing Authorization header" });
+  }
+
+  const token = authHeader.split(" ")[1]; // Extract token after 'Bearer'
+  if (token !== "mysecrettoken") {
+    return res.status(403).json({ error: "Invalid token" });
+  }
+
+  // If valid, continue
+  next();
+};
+
+// =====================
+// 3️⃣ Routes
+// =====================
+
+// Public route — no authentication required
+app.get("/public", (req, res) => {
+  res.json({ message: "This is a public route — anyone can access it!" });
+});
+
+// Protected route — requires Bearer token
+app.get("/protected", auth, (req, res) => {
+  res.json({ message: "Welcome! You have accessed the protected route." });
+});
+
+// =====================
+// 4️⃣ Start Server
+// =====================
+app.listen(PORT, () => {
+  console.log(`🚀 Server running on port ${PORT}`);
+});
