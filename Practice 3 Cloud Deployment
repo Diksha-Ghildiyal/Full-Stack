@@ -1,0 +1,126 @@
+Step 1 — Prepare the App
+Backend (Node/Express)
+
+Your backend should listen on port 3000 (or any) and respond to health checks:
+
+app.get("/health", (req, res) => res.sendStatus(200));
+
+Frontend (React)
+
+Set environment variable pointing to backend load balancer URL (later):
+
+REACT_APP_API_URL=https://<ALB-DNS-NAME>
+
+
+Build for production:
+
+npm run build
+
+Step 2 — Create EC2 Instances (Backend)
+
+Open EC2 → Launch Instance
+
+Select Amazon Linux 2023 / Ubuntu
+
+Instance type: t2.micro (Free-tier eligible)
+
+Security Group:
+
+Allow inbound 3000 (temporary, will restrict later)
+
+Allow inbound 22 from your IP (SSH)
+
+Install Node, Git, PM2
+sudo apt update && sudo apt install -y nodejs npm git
+npm install pm2 -g
+
+
+Clone your backend repo:
+
+git clone <your-backend-repo-url>
+cd backend
+npm install
+pm2 start server.js
+pm2 startup
+pm2 save
+
+
+Repeat for 2 EC2 instances — these will be load-balanced.
+
+Step 3 — Create Application Load Balancer (ALB)
+
+Go to EC2 → Load Balancers → Create Load Balancer
+
+Choose Application Load Balancer
+
+Scheme: Internet-Facing
+
+Listeners: HTTP 80
+
+Select VPC and subnets in at least 2 availability zones.
+
+Create Target Group:
+
+Type: Instance
+
+Protocol: HTTP
+
+Port: 3000
+
+Health Check Path: /health
+
+Register both backend EC2 instances.
+
+Update Backend EC2 Security Group:
+
+Remove public 3000 access
+
+Allow inbound 3000 only from Load Balancer SG
+
+Step 4 — Deploy Frontend (EC2)
+
+Launch another EC2 instance for frontend.
+
+Install nginx:
+
+sudo apt update && sudo apt install -y nginx
+
+
+Copy build output:
+
+sudo rm -rf /var/www/html/*
+sudo cp -r build/* /var/www/html/
+
+
+Set backend API URL using your ALB DNS:
+Edit build/static/js/main*.js if necessary, or use env vars during build.
+
+Restart nginx:
+
+sudo systemctl restart nginx
+
+
+Visit frontend public IP → It should call backend via ALB.
+
+Step 5 — Optional: Route 53 Domain Configuration
+
+Register a domain (or use existing).
+
+Create A-record → Alias → ALB DNS Name.
+
+For frontend, either:
+
+Use a separate subdomain (e.g., app.example.com) → A record to EC2 Elastic IP
+
+Or use CloudFront over S3 (recommended long-term).
+
+Step 6 — Confirm Load Balancer Traffic Distribution
+
+Open browser and refresh application multiple times.
+
+To test manually:
+
+pm2 stop server.js   # on instance 1
+
+
+App should still work using instance #2 → Load Balancer is functioning.
